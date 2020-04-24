@@ -1,24 +1,23 @@
 import React from 'react';
 import Flex from '../Flex/Flex';
-import { Button, Box } from '@material-ui/core';
+import { Box } from '@material-ui/core';
+import PendulumWrapperContainer from './Pendulum/PendulumWrapperContainer';
 
-
-function Main() {
-  const add = (a:number, b:number) => a + b;
-
-  const [count, setCount] = React.useState(0);
-  function incrementCountBy1() {
-    setCount(add(count, 1))
-  }
-
-  return (
-    <Flex>
-      <Flex flex={'none'} flexDirection={'column'}>
-        <Button onClick={() => incrementCountBy1()}>Increment 'Count' by 1</Button>
-        <Box component="span">{count}</Box>
-      </Flex>
+const Main = () => (
+  <Flex>
+    <Flex flex={'none'} flexDirection={'column'}>
+      <Box component="header">
+        <h2>Double Pendulum</h2>
+      </Box>
+      <PendulumWrapperContainer />
+      <article>
+        <section>
+          <p style={{textAlign: 'center'}}>This is my double pendulum</p>
+          <p style={{textAlign: 'center'}}>Feel free to mess around with the values</p>
+        </section>
+      </article>
     </Flex>
-  );
-}
+  </Flex>
+);
 
 export default Main;

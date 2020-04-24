@@ -35,6 +35,8 @@ const getTheme = (p: PaletteOptions) => {
   }, overwrites);
 }
 
+export const ThemeContextProvider = React.createContext(getTheme(darkPalette));
+
 function App() {
   const theme = getTheme(darkPalette);
   const [useBase, /* useSetBase */] = React.useState<CSSProperties>({
@@ -49,10 +51,12 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box style={useBase}>
-        <Header />
-        <Main />
-      </Box>
+      <ThemeContextProvider.Provider value={theme}>
+        <Box style={useBase}>
+          <Header />
+          <Main />
+        </Box>
+      </ThemeContextProvider.Provider>
     </ThemeProvider>
   );
 }
