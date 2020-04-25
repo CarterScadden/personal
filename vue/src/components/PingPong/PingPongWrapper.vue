@@ -1,5 +1,5 @@
 <template>
-  <PingPong :canvasWidth="canvasWidth" :canvasHeight="canvasHeight" />
+  <PingPong />
 </template>
 
 <script lang="ts">
@@ -8,8 +8,6 @@ import Vue from 'vue';
 import { defineComponent } from '@vue/composition-api';
 import PingPong from './PingPong.vue';
 interface Props {
-  canvasWidth: number
-  canvasHeight: number
 };
 
 export default defineComponent<Props>({
@@ -17,8 +15,6 @@ export default defineComponent<Props>({
     PingPong,
   },
   props: {
-    canvasWidth: Number,
-    canvasHeight: Number,
   },
   setup() {
     return ({

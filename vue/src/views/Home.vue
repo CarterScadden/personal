@@ -1,9 +1,6 @@
 <template>
   <div id="home">
-    <PingPongWrapper 
-      :canvasWidth="canvasWidth"
-      :canvasHeight="canvasHeight"
-    />
+    <PingPongWrapper />
   </div>
 </template>
 
@@ -24,11 +21,8 @@ export default defineComponent<Props>({
     
   },
   setup() {
-    const canvasWidth = 600;
-    const canvasHeight = 300;
     return ({
-      canvasWidth,
-      canvasHeight,
+
     });
   },
 });
@@ -36,7 +30,7 @@ export default defineComponent<Props>({
 
 <style lang="scss" scoped>
 #home {
-  width: 300px;
+  width: 600px;
   height: 300px;
   background-color: #fff;
 }

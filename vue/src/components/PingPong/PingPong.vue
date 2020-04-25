@@ -1,406 +1,367 @@
 <template>
-  <canvas 
-    id="pingpong-canvas"
-    :width="canvasWidth"
-    :height="canvasHeight"
+  <svg width="600" height="300" ref="pp-svg" style="background-color: rgb(33,33,33);">
+    <!-- If game is not started / has ended -->
+    <g v-show="!gaming"
+      @click="startGame"
+      style="cursor: pointer;"
+    >
+      <rect 
+        x="250"
+        y="125"
+        width="100"
+        height="50"
+        fill="rgb(33,33,33)"
+        stroke="white"
+      />
 
-    @mousemove="trackPosition"
-    @mousedown="btnClick"
-  >
-  
-  </canvas>
-  <!-- <audio preload="true" id="collide">
-    <source src="https://dl.dropbox.com/u/26141789/canvas/pingpong/Metal%20Cling%20-%20Hit.mp3" />
-    <source src="https://dl.dropbox.com/u/26141789/canvas/pingpong/Metal%20Cling%20-%20Hit.wav" />
-  </audio> -->
+      <text
+        fill="white"
+        :x="message.x"
+        y="155"
+      >{{message.value}}</text>
+    </g>
+
+    <text v-show="!gaming && won.won"
+      fill="white"
+      :x="won.x"
+      :y="won.y"
+    >{{won.message}}</text>
+
+    <text
+      fill="white"
+      x="10"
+      y="25"
+    >Score: {{players[0].points}}</text>
+
+    <text
+      fill="white"
+      x="530"
+      y="25"
+    >Score: {{players[1].points}}</text>
+
+    <!-- restart button -->
+    <rect v-for="(p, i) in players" :key="i"
+      :fill="p.color"
+      :x="p.x"
+      :y="p.y"
+      :width="p.width"
+      :height="p.height"
+    />
+
+    <!-- ball -->
+    <circle 
+      :cx="ball.x"
+      :cy="ball.y"
+      :r="ball.radius"
+      fill="yellow"
+    />
+  </svg>
 </template>
 
 <script lang="ts">
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import Vue from 'vue';
-import Component from 'vue-class-component';
 
-const Props = Vue.extend({
-  props: {
-    canvasWidth: {
-      required: true,
-      type: Number,
+interface Player {
+  x: 0 | 580;
+  y: number;
+  width: 20;
+  height: 90;
+  points: number;
+  movingUp: boolean;
+  movingDown: boolean;
+  color: 'green' | 'orange';
+}
+
+interface DATA {
+  currentPlayer: 0 | 1;
+  players: [Player, Player];
+  ball: {
+    x: number;
+    y: number;
+    velocity: {
+      x: number;
+      y: number;
+    };
+    radius: 3;
+  };
+  online: boolean;
+  gaming: boolean;
+  message: {
+    x: number;
+    value: string;
+  };
+  won: {
+    x: number;
+    y: number;
+    won: boolean;
+    message: 'Player 1 Won!' | 'Player 2 Won!';
+  };
+}
+
+export default Vue.extend({
+  // Useing https://github.com/posva/vue-reactive-refs for reactive refs to watch the svg
+  refs: ['pp-svg'],
+
+  data: (): DATA => ({
+    currentPlayer: 1,
+    players: [
+      {
+        x: 0,
+        y: 110,
+        width: 20,
+        height: 90,
+        points: 0,
+        movingUp: false,
+        movingDown: false,
+        color: 'green',
+      },
+      {
+        x: 580,
+        y: 110,
+        width: 20,
+        height: 90,
+        points: 0,
+        movingUp: false,
+        movingDown: false,
+        color: 'orange',
+      }
+    ],
+    ball: {
+      x: 300,
+      y: 100,
+      velocity: {
+        x: 0,
+        y: 0,
+      },
+      radius: 3,
     },
-    canvasHeight: {
-      required: true,
-      type: Number,
+    online: false,
+    gaming: false,
+    message: {
+      x: 282,
+      value: 'Start',
+    },
+    won: {
+      x: 300,
+      y: 150,
+      won: false,
+      message: 'Player 1 Won!',
+    },
+  }),
+
+  methods: {
+    keyup(e: KeyboardEvent) {
+      const { currentPlayer, } = this;
+      const { key, } = e;
+      
+      switch (key) {
+        case 'w':
+          this.players[currentPlayer].movingUp = false;
+          break;
+        case 's':
+          this.players[currentPlayer].movingDown = false;
+          break;
+        case 'ArrowUp':
+          this.players[currentPlayer].movingUp = false;
+          break;
+        case 'ArrowDown':
+          this.players[currentPlayer].movingDown = false;
+          break;
+      }
+    },
+
+    keydown(e: KeyboardEvent) {
+      const { currentPlayer, } = this;
+      const { key, } = e;
+      
+      switch (key) {
+        case 'w':
+          this.players[currentPlayer].movingUp = true;
+          this.players[currentPlayer].movingDown = false;
+          break;
+        case 's':
+          this.players[currentPlayer].movingDown = true;
+          this.players[currentPlayer].movingUp = false;
+          break;
+        case 'ArrowUp':
+          this.players[currentPlayer].movingUp = true;
+          this.players[currentPlayer].movingDown = false;
+          break;
+        case 'ArrowDown':
+          this.players[currentPlayer].movingDown = true;
+          this.players[currentPlayer].movingUp = false;
+          break;
+      }
+    },
+
+    startGame() {
+      this.gaming = false;
+      this.message.value = 'Restart';
+      this.message.x = 275;
+      this.won.won = false;
+
+      document.addEventListener('keyup', this.keyup);
+      document.addEventListener('keydown', this.keydown);
+
+      if (this.online) {
+        console.log('GOING TO ONLINE');
+        return;
+      }
+
+      this.startGameOffline();
+    },
+
+    gameover(playerNumber: 0 | 1) {
+      this.gaming = false;
+
+      this.players[0].points = 0;
+      this.players[1].points = 0;
+
+      this.ball = {
+        x: 300,
+        y: 100,
+        velocity: {
+          x: 0,
+          y: 0,
+        },
+        radius: 3,
+      };
+
+      if (playerNumber === 0) {
+        this.won.message = 'Player 1 Won!';
+      } else {
+        this.won.message = 'Player 2 Won!';
+      }
+    },
+
+    resetFromGoal() {
+      this.ball = {
+        x: 300,
+        y: 100,
+        velocity: {
+          x: -5,
+          y: -5,
+        },
+        radius: 3,
+      };
+    },
+
+    checkIfPlayerHit(): boolean {
+      const { x, y, radius, } = this.ball;
+
+      // Subtracting the balls x by the radius for more accurate calculations
+      if ((this.players[0].x + 20) >= (x - radius)) {
+        const underTop = this.players[0].y < y;
+        const overBottom = (this.players[0].y + this.players[0].height) > y;
+
+        if (underTop && overBottom) {
+          return true;
+        } else {
+          // For the sake of not complicating the code more, The ball will be 
+          // counted as scored
+          return false;
+        }
+      } else if (this.players[1].x <= (x + radius)) {
+        const underTop = this.players[1].y < y;
+        const overBottom = (this.players[1].y + this.players[1].height) > y;
+
+        if (underTop && overBottom) {
+          return true;
+        } else {
+          // For the sake of not complicating the code more, The ball will be 
+          // counted as scored
+          return false;
+        }
+      };
+
+      return false;
+    },
+
+    startGameOffline() {
+      this.gaming = true;
+      // Make the ball move
+      this.ball.velocity.x = -5;
+      this.ball.velocity.y = -5;
+      
+      const game = () => {
+        this.players.forEach((player: Player) => {
+          const { y, movingUp, movingDown, } = player;
+          if (movingDown) {
+            if (y !== 210) player.y += 7;
+          } else if (movingUp) {
+            if (y !== 0) player.y -= 7;
+          }
+
+          // for online
+          // if (player.y !== y) {
+
+          // }
+        });
+
+        const { ball, } = this;
+        const { x, y, radius, } = ball;
+        
+        const playerhit = this.checkIfPlayerHit();
+
+        // If player paddle is not hit
+        if (!playerhit) {
+          // If ball is in place for a score
+          if (x <= radius || x >= (580 - radius)) { // Subtracted by 3 for the radius
+            if (x <= 0) {
+              this.players[1].points++;
+
+              if (this.players[1].points === 5) {
+                this.gameover(1);
+              }
+            } else {
+              this.players[0].points++;
+              
+              if (this.players[0].points === 5) {
+                this.gameover(0);
+              }
+            }
+
+            this.resetFromGoal();
+          }
+
+          if (y <= radius || y >= 293) {
+            this.ball.velocity.y *= -1;
+
+            // if (y <=3) {
+            //   this.ball.velocity.y *= -1
+            // } else {
+              
+            // }
+          }
+        } else { // If player paddle is hit
+          if (this.ball.velocity.x < 9) {
+            this.ball.velocity.x *= -1.2;
+          }
+        }
+        
+        this.ball.x += this.ball.velocity.x;
+        this.ball.y += this.ball.velocity.y;
+
+        setTimeout(game, 25);
+      };
+
+      game();
     },
   },
-});
 
-const add = (a: number, b: number) => a + b;
-const sub = (a: number, b: number) => a - b;
-
-class Paddle {
-  height: number;
-  width: number;
-  x: number;
-  y: number;
-
-  constructor(
-    position: string,
-    canvasWidth: number,
-    canvasHeight: number
-  ) {
-    this.height = 5;
-    this.width = 150;
-
-    this.x = (canvasWidth / 2) - (this.width / 2);
-    this.y = (position === 'top') ? 0 : (canvasHeight - this.height);
-  }
-}
-
-class Particle {
-  x: number;
-  y: number;
-  radius: number;
-  vx: number;
-  vy: number;
-  constructor(
-    x: number,
-    y: number,
-    m: number
-  ) {
-    this.x = x || 0;
-    this.y = y || 0;
-    
-    this.radius = 1.2;
-    
-    this.vx = -1.5 + Math.random() * 3;
-    this.vy = m * Math.random() * 1.5;
-  }
-}
-
-@Component
-export default class PingPong extends Props {
-  ctx: CanvasRenderingContext2D = new CanvasRenderingContext2D();
-  mouse = { x: 0, y: 0, };
-  points = 0;
-  multiplier = 1;
-  flag = false;
-  over = false;
-  paddleHit: 'left' | 'right' = 'left';
-  paddles: Paddle[] = [
-    new Paddle(
-      'bottom',
-      this.canvasWidth,
-      this.canvasHeight
-    ),
-    new Paddle(
-      'top',
-      this.canvasWidth,
-      this.canvasHeight
-    )
-  ];
-
-  particle = new Particle(0, 0, 0);
-  particlesCount = 20;
-  particles: Particle[] = [];
-      
-  ball = { x: 50, y: 50, r: 5, c: 'green', vx: 4, vy: 8, };
-  // Start Button object
-  startBtn = {
-    w: 100,
-    h: 50,
-    x: this.canvasWidth / 2 - 50,
-    y: this.canvasHeight / 2 - 25,
-    message: 'Start',
-  };
-
-  buttonDraw() {
-    const { x, y, w, h, message, } = this.startBtn;
-
-    this.ctx.strokeStyle = 'blue';
-    this.ctx.lineWidth = 2;
-    this.ctx.strokeRect(x, y, w, h);
-    
-    this.ctx.font = '18px Arial, sans-serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillStyle = 'Green';
-    this.ctx.fillText(
-      message, 
-      this.canvasWidth / 2,
-      this.canvasHeight / 2
-    );
-
-    this.startBtn.message = this.startBtn.message === 'Reset' ? 'Start' : 'Reset';
-  };
-
-  reverseBallDirection() {
-    this.ball.vy = -this.ball.vy;
-  };
-
-  // Function for drawing ball on canvas
-  ballDraw() {
-    const { c, x, y, r, } = this.ball;
-    this.ctx.beginPath();
-    this.ctx.fillStyle = c;
-    this.ctx.arc(x, y, r, 0, Math.PI * 2, false);
-    this.ctx.fill();
-  };
-
-  trackPosition(e: MouseEvent) {
-    this.mouse.x = e.pageX;
-    this.mouse.y = e.pageY;
-  };
-
-  btnClick(e: MouseEvent) {
-    // Variables for storing mouse position on click
-    const mx = e.pageX;
-    // const my = e.pageY;
-
-    // Click start button
-    if (mx >= this.startBtn.x && mx <= this.startBtn.x + this.startBtn.w) {
-      // start animation
-      this.draw();
-
-      this.startBtn.message = 'Reset';
-      this.buttonDraw();
-    }
-
-    // If the game is over, and the restart button is clicked
-    if (this.over) {
-      if (mx >= this.startBtn.x && mx <= this.startBtn.x + this.startBtn.w) {
-        this.ball.x = 20;
-        this.ball.y = 20;
-        this.points = 0;
-        this.ball.vx = 4;
-        this.ball.vy = 8;
-        
-        // start animation
-        this.draw();      
-        this.over = false;
-      }
-    }
-  };
-
-  paintCanvas() {
-    this.ctx.fillStyle = 'black';
-    this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
-  };
-
-  collides(paddle: Paddle) {
-    const { ball, } = this;
-    const { x, y, r, } = ball;
-    
-    if (((x + r) >= (paddle.x)) && ((x - r) <= (paddle.x + paddle.width))) {
-      if (y >= (paddle.y - paddle.height) && (paddle.y > 0)) {
-        this.leftPaddleHit(paddle);
-      } else if (y <= paddle.height && paddle.y === 0) {
-        this.rightPaddleHit(paddle);
-      }
-    }
-
-    return false;
-  }
-
-  leftPaddleHit(paddle: Paddle) {
-    this.ball.y = sub(paddle.y, paddle.height);
-    this.particle.y = add(this.ball.y, this.ball.r);
-    this.multiplier = -1;
-  };
-
-  rightPaddleHit(paddle: Paddle) {
-    this.ball.y = add(paddle.y, paddle.height);
-    this.particle.y = sub(this.ball.y, this.ball.r);
-    this.multiplier = 1;
-  };
-
-  increaseSpeed() {
-    // Increment points
-    this.points++;
-
-    // every 5 points increase the speed of the ball
-    if (this.points % 4 === 0) {
-      if (Math.abs(this.ball.vx) < 15) {
-        this.ball.vx += (this.ball.vx < 0) ? -1 : 1;
-        this.ball.vy += (this.ball.vy < 0) ? -2 : 2;
-      }
-    }
-  };
-
-  emitParticles() { 
-    this.particles.forEach((p) => {
-      this.ctx.beginPath(); 
-      this.ctx.fillStyle = 'white';
-      
-      if (p.radius > 0) {
-        this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2, false);
-      }
-
-      this.ctx.fill();
-      
-      p.x += p.vx; 
-      p.y += p.vy; 
-      
-      // Reduce radius so that the particles die after a few seconds
-      p.radius = Math.max(p.radius - 0.05, 0.0); 
-    });
-  };
-
-  collideAction(paddle: Paddle) {
-    // reverse
-    this.reverseBallDirection();
-    if (this.paddleHit === 'left') {
-      this.leftPaddleHit(paddle);
-    } else {
-      this.rightPaddleHit(paddle);
-    }
-
-    this.increaseSpeed();
-  
-    // Collesion (sound stuff)
-
-    // if(this.collision) {
-    //   if(this.points > 0)  {
-    //     collision.pause();
-    //   }
-      
-    //   collision.currentTime = 0;
-    //   collision.play();
-    // }
-    
-    this.particle.x = this.ball.x;
-    this.flag = false;
-  };
-
-  update() {
-    this.updateScore(); 
-    
-    // Move paddles
-    if (this.mouse.x && this.mouse.y) {
-      for (let i = 1; i < this.paddles.length; i++) {
-        this.paddles[i].x = (this.mouse.x - this.paddles[i].width / 2);
-      }
-    }
-    
-    // Move the ball with its velocity (no need for more math with this as acceleration is not a factor)
-    this.ball.x += this.ball.vx;
-    this.ball.y += this.ball.vy;
-
-    // check if the left paddle was hit, if true take action with it and return true
-    let collisionHappend = this.collides(this.paddles[1]);
-    // check if the right paddle was hit, if true take action with it and return true
-    if (!collisionHappend) {
-      collisionHappend = this.collides(this.paddles[2]); 
-    }
-
-    // If neither paddle was hit
-    if (!collisionHappend) {
-      // Collide with walls, If the ball hits the top/bottom,
-      // walls, run gameOver() function
-
-      if (this.ball.y + this.ball.r > this.canvasHeight) {
-        this.ball.y = (this.canvasHeight - this.ball.r);
-        console.error('GAME OVER');
-
-        this.gameOver();
-      } else if (this.ball.y < 0) {
-        this.ball.y = this.ball.r;
-        console.error('GAME OVER');
-
-        this.gameOver();
-      }
-      
-      // If ball strikes the vertical walls, invert the 
-      // x-velocity vector of ball
-      if (this.ball.x + this.ball.r > this.canvasWidth) {
-        this.ball.vx = -this.ball.vx;
-        this.ball.x = this.canvasWidth - this.ball.r;
-      } else if (this.ball.x - this.ball.r < 0) {
-        this.ball.vx = -this.ball.vx;
-        this.ball.x = this.ball.r;
-      }
-    }
-    
-    // If flag is set, push the particles
-    if (this.flag) { 
-      for (let i = 0; i < this.particlesCount; i++) {
-        this.particles.push(
-          new Particle(
-            this.particle.x,
-            this.particle.y,
-            this.multiplier
-          )
-        );
-      }
-    };
-    
-    // Emit particles/sparks
-    this.emitParticles();
-    
-    // reset flag
-    this.flag = false;
-  };
-
-  // Function to run when the game overs
-  gameOver() {
-    this.ctx.fillStyle = 'white';
-    this.ctx.font = '20px Arial, sans-serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(
-      `Game Over - You scored ${this.points} points!`,
-      this.canvasWidth / 2,
-      this.canvasHeight / 2 + 25
-    );
-    
-    // // Stop the Animation
-    // cancelRequestAnimFrame(init);
-    
-    // Set the over flag
-    this.over = true;
-    
-    // Show the restart button
-    this.buttonDraw();
-  }
-
-  // Function to execute at startup
-  startScreen() {
-    this.draw();
-    this.buttonDraw();
-  };
-
-  // Draw everything on canvas
-  draw() {
-    this.paintCanvas();
-
-    this.paddles.forEach(({ x, y, width, height, }) => {
-      this.ctx.fillStyle = 'green';
-      this.ctx.fillRect(x, y, width, height);
-    });
-    
-    this.ballDraw();
-    this.update();
-
-    setTimeout(this.draw, 200);
-  };
-  
-  // Function for updating score
-  updateScore() {
-    this.ctx.fillStyle = 'white';
-    this.ctx.font = '16px Arial, sans-serif';
-    this.ctx.textAlign = 'left';
-    this.ctx.textBaseline = 'top';
-    this.ctx.fillText('Score: ' + this.points, 20, 20);
-  };
-
-  // On mounted
   mounted() {
-    const ctx = document.getElementById('pingpong-canvas') as CanvasRenderingContext2D;
-    
-    if (ctx) {
-      this.ctx = ctx;
-      this.startScreen();
-    }
-  };
-};
+    this.currentPlayer = 0;
+    console.log(this.currentPlayer);
+  },
+
+  beforeDestroy() {
+    // @ts-ignore
+    document.removeEventListener('keyup', this.keyup);
+    // @ts-ignore
+    document.removeEventListener('keydown', this.keydown);
+  },
+});
 
 </script>
 

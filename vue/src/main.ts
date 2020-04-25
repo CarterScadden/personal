@@ -5,8 +5,11 @@ import router from './router';
 import store from './store';
 import vuetify from './plugins/vuetify';
 import VueCompositionApi from '@vue/composition-api';
+import { ReactiveRefs } from 'vue-reactive-refs';
 
 Vue.use(VueCompositionApi);
+Vue.use(ReactiveRefs);
+
 Vue.config.productionTip = false;
 
 new Vue({
@@ -14,5 +17,5 @@ new Vue({
   store,
   // @ts-ignore
   vuetify,
-  render: h => h(App)
+  render: h => h(App),
 }).$mount('#app');
