@@ -29,9 +29,4 @@ export default defineComponent<Props>({
 </script>
 
 <style lang="scss" scoped>
-#home {
-  width: 600px;
-  height: 300px;
-  background-color: #fff;
-}
 </style>

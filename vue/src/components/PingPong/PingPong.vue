@@ -1,7 +1,7 @@
 <template>
   <svg width="600" height="300" ref="pp-svg" style="background-color: rgb(33,33,33);">
     <!-- If game is not started / has ended -->
-    <g v-show="!gaming"
+    <g v-show="!gaming && !online"
       @click="startGame"
       style="cursor: pointer;"
     >
@@ -19,6 +19,26 @@
         :x="message.x"
         y="155"
       >{{message.value}}</text>
+    </g>
+
+    <g v-show="!gaming && online"
+      @click="toggleReady"
+      style="cursor: pointer;"
+    >
+      <rect 
+        x="250"
+        y="125"
+        width="100"
+        height="50"
+        :fill="!ready.ready ? 'rgb(33,33,33)' : 'rgba(124,252,0, 0.5)'"
+        stroke="white"
+      />
+
+      <text
+        fill="white"
+        :x="ready.x"
+        y="155"
+      >{{ready.value}}</text>
     </g>
 
     <text v-show="!gaming && won.won"
@@ -61,6 +81,25 @@
 <script lang="ts">
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import Vue from 'vue';
+import axios from 'axios';
+
+interface OnlinePingPong {
+  data: OnlineGameData;
+  player: -1 | 0 | 1;
+  gaming: boolean;
+  error?: string;
+};
+
+interface OnlineGameData {
+  players: [OnlinePlayer, OnlinePlayer];
+  ball: Ball;
+}
+
+interface OnlinePlayer {
+  x: number;
+  y: number;
+  points: number;
+}
 
 interface Player {
   x: 0 | 580;
@@ -71,25 +110,30 @@ interface Player {
   movingUp: boolean;
   movingDown: boolean;
   color: 'green' | 'orange';
-}
+};
+
+interface Ball {
+  x: number;
+  y: number;
+  velocity: {
+    x: number;
+    y: number;
+  };
+  radius: 3;
+};
 
 interface DATA {
   currentPlayer: 0 | 1;
   players: [Player, Player];
-  ball: {
-    x: number;
-    y: number;
-    velocity: {
-      x: number;
-      y: number;
-    };
-    radius: 3;
-  };
-  online: boolean;
-  gaming: boolean;
+  ball: Ball;
   message: {
     x: number;
     value: string;
+  };
+  ready: {
+    x: number;
+    value: string;
+    ready: boolean;
   };
   won: {
     x: number;
@@ -103,7 +147,17 @@ export default Vue.extend({
   // Useing https://github.com/posva/vue-reactive-refs for reactive refs to watch the svg
   refs: ['pp-svg'],
 
+  props: {
+    online: Boolean,
+    gaming: Boolean,
+  },
+
   data: (): DATA => ({
+    ready: {
+      x: 267,
+      value: 'Ready Up',
+      ready: false,
+    },
     currentPlayer: 1,
     players: [
       {
@@ -136,8 +190,6 @@ export default Vue.extend({
       },
       radius: 3,
     },
-    online: false,
-    gaming: false,
     message: {
       x: 282,
       value: 'Start',
@@ -195,8 +247,23 @@ export default Vue.extend({
       }
     },
 
+    /**
+     * toggles this.ready.ready
+     * and toggles the message from ReadyUp to Looking and vis versa 
+    */
+    toggleReady() {
+      if (!this.ready.ready) {
+        this.ready.ready = true;
+        this.ready.value = 'Looking...';
+        this.startGame();
+      } else {
+        this.ready.ready = false;
+        this.ready.value = 'Ready Up';
+      }
+    },
+
     startGame() {
-      this.gaming = false;
+      this.$emit('toggle-gaming-off');
       this.message.value = 'Restart';
       this.message.x = 275;
       this.won.won = false;
@@ -205,7 +272,7 @@ export default Vue.extend({
       document.addEventListener('keydown', this.keydown);
 
       if (this.online) {
-        console.log('GOING TO ONLINE');
+        this.startGameOnline();
         return;
       }
 
@@ -213,7 +280,7 @@ export default Vue.extend({
     },
 
     gameover(playerNumber: 0 | 1) {
-      this.gaming = false;
+      this.$emit('toggle-gaming-off');
 
       this.players[0].points = 0;
       this.players[1].points = 0;
@@ -278,26 +345,132 @@ export default Vue.extend({
       return false;
     },
 
-    startGameOffline() {
-      this.gaming = true;
-      // Make the ball move
-      this.ball.velocity.x = -5;
-      this.ball.velocity.y = -5;
-      
-      const game = () => {
-        this.players.forEach((player: Player) => {
-          const { y, movingUp, movingDown, } = player;
-          if (movingDown) {
-            if (y !== 210) player.y += 7;
-          } else if (movingUp) {
-            if (y !== 0) player.y -= 7;
+    startGameOnline() {
+      const socket = new WebSocket('ws://localhost:8844/ws');
+      const update = () => {
+        // If the user stops looking for a game stop responding
+        if (!this.ready.ready) {
+          return;
+        }
+
+        socket.onmessage = async(event) => {
+          const res: OnlinePingPong = JSON.parse(event.data);
+          if (res.error) {
+            socket.close();
+            console.error('[server error]: ', res.error);
+            return;
           }
 
-          // for online
-          // if (player.y !== y) {
+          // While still searching for a game
+          if (!this.gaming) {
+            // data.player will always be -1 unless you have just connected.
+            // If you have just connected the server assigns you to a certain player
+            if (res.player !== -1) {
+              this.currentPlayer = res.player;
+            } else if (res.gaming) {
+              this.$emit('toggle-gaming-on');
+            }
+          } else { // Update from the data given by the server
+            if (res.data.players) {
+              this.updatePlayersFromOnline(res.data.players);
+            }
+            // This is now a ball position update
+            if (res.data.ball) {
+              this.ball = res.data.ball; 
+            }
 
-          // }
+            if (!res.gaming) {
+              for (const i in res.data.players) {
+                if (res.data.players[i].points === 5) {
+                  this.gameover(+i as 0 | 1);
+                  this.$emit('toggle-online-off');
+                  this.ready.ready = false;
+                  return; 
+                }
+              }
+            }
+          }
+        };
+
+        // Check if the player has done anything
+        const req = {
+          player: this.currentPlayer, 
+          data: {
+            movingUp: this.players[this.currentPlayer].movingUp,
+            movingDown: this.players[this.currentPlayer].movingDown,
+          },
+        };
+        
+        const fetching = axios.post('http://localhost:8844/pingpong', req);
+        fetching.then(() => {
+          setTimeout(update);
         });
+      };
+
+      update();
+    },
+
+    /**
+     * updates the local players from the online players
+    **/
+    updatePlayersFromOnline(players: OnlinePlayer[]) {
+      const updatePlayer = (i: number) => {
+        this.players[i].x = players[i].x as 0 | 580;
+        this.players[i].y = players[i].y;
+        this.players[i].points = players[i].points;
+      };
+      
+      updatePlayer(this.currentPlayer);
+      updatePlayer(this.currentPlayer === 0 ? 1 : 0);
+    },
+
+    startGameOffline() {
+      this.$emit('toggle-gaming-on');
+      // Make the ball move
+      this.ball = {
+        x: 300,
+        y: 100,
+        velocity: {
+          x: -5,
+          y: -5,
+        },
+        radius: 3,
+      };
+      
+      const game = () => {
+        const {
+          y: playerY,
+          movingUp,
+          movingDown,
+        } = this.players[this.currentPlayer];
+        if (movingDown) {
+          if (playerY <= 210) this.players[this.currentPlayer].y += 7;
+        } else if (movingUp) {
+          if (playerY >= 0) this.players[this.currentPlayer].y -= 7;
+        }
+
+        // Move the computer
+        const {
+          y: computerY,
+          movingUp: computerMovingUp,
+          movingDown: computerMovingDown,
+        } = this.players[this.currentPlayer === 0 ? 1 : 0];
+
+        if (computerMovingDown) {
+          if (computerY <= 210) this.players[this.currentPlayer === 0 ? 1 : 0].y += 7;
+          else {
+            this.players[this.currentPlayer === 0 ? 1 : 0].movingDown = false;
+            this.players[this.currentPlayer === 0 ? 1 : 0].movingUp = true;
+          }
+        } else if (computerMovingUp) {
+          if (computerY >= 0) this.players[this.currentPlayer === 0 ? 1 : 0].y -= 7;
+          else {
+            this.players[this.currentPlayer === 0 ? 1 : 0].movingDown = true;
+            this.players[this.currentPlayer === 0 ? 1 : 0].movingUp = false;
+          }
+        } else {
+          this.players[this.currentPlayer === 0 ? 1 : 0].movingUp = true;
+        }
 
         const { ball, } = this;
         const { x, y, radius, } = ball;
@@ -312,13 +485,17 @@ export default Vue.extend({
               this.players[1].points++;
 
               if (this.players[1].points === 5) {
+                // announce that the game is over and stop the current game
                 this.gameover(1);
+                return;
               }
             } else {
               this.players[0].points++;
               
               if (this.players[0].points === 5) {
+                // announce that the game is over and stop the current game
                 this.gameover(0);
+                return;
               }
             }
 
@@ -327,12 +504,6 @@ export default Vue.extend({
 
           if (y <= radius || y >= 293) {
             this.ball.velocity.y *= -1;
-
-            // if (y <=3) {
-            //   this.ball.velocity.y *= -1
-            // } else {
-              
-            // }
           }
         } else { // If player paddle is hit
           if (this.ball.velocity.x < 9) {
