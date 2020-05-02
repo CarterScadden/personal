@@ -2,19 +2,19 @@
   <Flex style="flex-direction: column;">
     <Flex style="max-width: fit-content; margin: 0em 0em 0.5em 0em;">
       <v-btn 
-        style="width: fit-content;"
-        @click="toggleOnline"
-        :style="online ? 'background-color: green;' : ''"
+        @click="toggleAmountOfPlayers"
         :disabled="gaming"
-      >Go Online</v-btn>
+        style="width: fit-content;"
+      >
+        {{players === 1 ? 'Single Player (endless)' : 'Two Player (first to five)'}}
+      </v-btn>
     </Flex>
+
     <PingPong 
-      :online="online"
-      
       :gaming="gaming"
+      :players="players"
       @toggle-gaming-on="setGaming(true)"
       @toggle-gaming-off="setGaming(false)"
-      @toggle-online-off="toggleOnline"
     />
   </Flex>
 </template>
@@ -25,9 +25,8 @@ import Vue from 'vue';
 import { defineComponent } from '@vue/composition-api';
 import PingPong from './PingPong.vue';
 import Flex from '../Flex/Flex.vue';
-
-import { useOnline } from './useOnline';
 import { useGaming } from './useGaming';
+import { usePlayers } from './usePlayers';
 
 interface Props {
 };
@@ -40,24 +39,22 @@ export default defineComponent<Props>({
   props: {
   },
   setup() {
-    const [online, setOnline] = useOnline(false);
-    const toggleOnline = () => {
-      if (online.value) {
-        setOnline(false);
-        return;
-      }
+    const [gaming, setGaming] = useGaming();
+    const [players, setPlayers] = usePlayers(1);
 
-      setOnline(true);
+    const toggleAmountOfPlayers = () => {
+      if (players.value === 1) {
+        setPlayers(2);
+      } else {
+        setPlayers(1);
+      }
     };
 
-    const [gaming, setGaming] = useGaming();
-
     return ({
-      online,
-      toggleOnline,
-
       gaming,
       setGaming,
+      players,
+      toggleAmountOfPlayers,
     });
   },
 });
